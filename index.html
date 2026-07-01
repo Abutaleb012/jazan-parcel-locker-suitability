@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jazan Smart Parcel Locker Suitability Dashboard</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#0C2029; --ink-2:#123240; --ink-3:#1B4150;
+    --sea:#0FA79E; --sea-dim:#0c8079;
+    --surface:#EEF2F3; --card:#FFFFFF; --line:#DCE4E6;
+    --text:#0C2029; --soft:#5B6E75; --faint:#8A9AA0;
+    --exc:#17A24A; --good:#2F6FEB; --mod:#E39A20; --low:#D9534A;
+    --mono: ui-monospace,'SF Mono','Cascadia Code','Roboto Mono',Menlo,Consolas,monospace;
+    --sans: system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --r:12px; --shadow:0 1px 2px rgba(12,32,41,.06),0 8px 24px rgba(12,32,41,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:var(--sans);background:var(--surface);color:var(--text);-webkit-font-smoothing:antialiased}
+  .app{max-width:1320px;margin:0 auto;padding:16px}
+
+  /* Header */
+  header.top{background:linear-gradient(180deg,var(--ink) 0%,var(--ink-2) 100%);color:#EAF2F3;border-radius:var(--r);padding:18px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  header.top::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:linear-gradient(90deg,var(--sea),var(--exc),var(--mod),var(--low))}
+  .htop{display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;justify-content:space-between}
+  .titlerow{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px}
+  .brand h1{margin:0;font-size:20px;font-weight:650;letter-spacing:-.2px}
+  .artitle{font-size:18px;font-weight:600;color:#BFE0DD;direction:rtl}
+  .plain{margin-top:6px;font-size:13.5px;color:#CFE3E2;font-weight:400;max-width:640px;line-height:1.4}
+  .brand .sub{margin-top:8px;font-family:var(--mono);font-size:10px;color:#7FA9A6;letter-spacing:1px;text-transform:uppercase;opacity:.85}
+  .coord{margin-top:4px;font-family:var(--mono);font-size:11px;color:#7FB3AF}
+  .avgwrap{display:flex;gap:16px;align-items:center}
+  .avgcard{text-align:right}
+  .avgcard .lab{font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#8FB9B6}
+  .avgcard .val{font-family:var(--mono);font-size:30px;font-weight:600;line-height:1;color:#fff}
+  .avgcard .val small{font-size:13px;color:#8FB9B6}
+
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .lchip{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);padding:5px 10px;border-radius:999px;font-size:11.5px;color:#DCEbEa;font-family:var(--mono)}
+  .dot{width:9px;height:9px;border-radius:2px;display:inline-block}
+
+  /* Layout */
+  .grid{display:grid;grid-template-columns:250px 1fr 330px;gap:14px;margin-top:14px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+  .panel .ph{padding:12px 14px 0;font-family:var(--mono);font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--faint)}
+  .pb{padding:12px 14px}
+
+  /* Filters */
+  .fgroup{margin-bottom:14px}
+  .fgroup:last-child{margin-bottom:0}
+  label.flab{display:block;font-size:12px;font-weight:600;color:var(--soft);margin-bottom:6px}
+  select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;font-family:var(--sans);font-size:13px;color:var(--text)}
+  .checks{display:flex;flex-direction:column;gap:7px}
+  .chk{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);cursor:pointer;user-select:none}
+  .chk input{accent-color:var(--sea);width:15px;height:15px}
+  .chk .cdot{width:9px;height:9px;border-radius:2px}
+  .maptoggles{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+  .tbtn{flex:1;min-width:0;font-family:var(--mono);font-size:11px;letter-spacing:.3px;padding:8px 6px;border:1px solid var(--line);background:#fff;border-radius:8px;color:var(--soft);cursor:pointer;text-align:center;transition:.15s}
+  .tbtn.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  /* KPI cards */
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:#fff}
+  .kpi .n{font-family:var(--mono);font-size:22px;font-weight:600;line-height:1}
+  .kpi .l{font-size:10.5px;color:var(--soft);margin-top:3px;letter-spacing:.2px}
+  .kpi.exc .n{color:var(--exc)} .kpi.good .n{color:var(--good)} .kpi.mod .n{color:var(--mod)} .kpi.low .n{color:var(--low)}
+
+  .cov{display:flex;flex-direction:column;gap:11px}
+  .covrow .cvtop{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--soft)}
+  .covrow .cvtop b{font-family:var(--mono);font-size:15px;color:var(--text)}
+  .bar{height:7px;border-radius:6px;background:#EAEFF0;margin-top:5px;overflow:hidden}
+  .bar span{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,var(--sea),var(--sea-dim))}
+
+  /* Map */
+  #map{height:560px;width:100%;border-radius:0 0 var(--r) var(--r)}
+  .panel.mappanel{padding:0;overflow:hidden}
+  .mapcaption{padding:10px 14px;background:#F6FBFA;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--soft);line-height:1.4}
+  .mapcaption b{color:var(--text);font-weight:600}
+  .mapnote{font-family:var(--mono);font-size:10.5px;color:var(--faint);padding:8px 12px;border-top:1px solid var(--line);background:#fff}
+
+  /* Table */
+  .tablewrap{max-height:530px;overflow:auto}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  thead th{position:sticky;top:0;background:#fff;text-align:left;font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);padding:9px 10px;border-bottom:1px solid var(--line);z-index:1}
+  tbody td{padding:9px 10px;border-bottom:1px solid #EFF3F4;vertical-align:middle}
+  tbody tr{cursor:pointer;transition:background .12s}
+  tbody tr:hover{background:#F4FAF9}
+  .rank{font-family:var(--mono);color:var(--faint);font-size:11px}
+  .sname{font-weight:600;font-size:12.5px;line-height:1.2}
+  .shood{font-size:11px;color:var(--soft)}
+  .scorepill{font-family:var(--mono);font-weight:600;font-size:12.5px;padding:3px 8px;border-radius:6px;color:#fff;display:inline-block;min-width:34px;text-align:center}
+
+  /* Charts */
+  .charts{display:grid;grid-template-columns:1fr 1.4fr;gap:14px;margin-top:14px}
+  .chartbox{height:230px;position:relative}
+  .chartbox canvas{max-height:230px}
+  .chthesis{font-size:11.5px;color:var(--soft);padding:0 14px 12px;line-height:1.45}
+
+  footer.foot{margin-top:14px;text-align:center;line-height:1.6;padding:10px}
+  .credit-line{font-family:var(--sans);font-size:13px;color:var(--text);margin-bottom:5px}
+  .credit-line b{color:var(--sea-dim);font-weight:650}
+  .foot .disc{font-family:var(--mono);font-size:10px;color:var(--faint);line-height:1.6}
+
+  .map-credit{background:rgba(11,26,33,.78);color:#CFE3E2;font-family:var(--mono);font-size:10.5px;letter-spacing:.4px;padding:4px 9px;border-radius:6px;border:1px solid rgba(255,255,255,.14)}
+
+  /* Leaflet popup */
+  .leaflet-popup-content-wrapper{border-radius:10px;box-shadow:var(--shadow)}
+  .pop{font-family:var(--sans);min-width:210px}
+  .pop h4{margin:0 0 2px;font-size:13.5px}
+  .pop .ph2{font-size:11px;color:var(--soft);margin-bottom:8px}
+  .pop .prow{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:#334;margin:3px 0}
+  .pop .prow span:last-child{font-weight:600}
+  .pop .final{display:flex;align-items:center;gap:8px;margin:8px 0 6px}
+  .pop .final .big{font-family:var(--mono);font-size:26px;font-weight:600;line-height:1}
+  .pop .cls{font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;color:#fff}
+  .minibar{height:5px;background:#EAEFF0;border-radius:4px;overflow:hidden;margin-top:2px}
+  .minibar span{display:block;height:100%;background:var(--sea)}
+
+  @media (max-width:1000px){
+    .grid{grid-template-columns:1fr}
+    #map{height:440px}
+    .charts{grid-template-columns:1fr}
+    .avgwrap{width:100%;justify-content:flex-start}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="htop">
+      <div class="brand">
+        <div class="titlerow">
+          <h1>Jazan Smart Parcel Locker Suitability</h1>
+          <div class="artitle" lang="ar">أفضل مواقع محطات الطرود الذكية في جازان</div>
+        </div>
+        <div class="plain">Finding the best places for parcel lockers in Jazan so more deliveries succeed the first time.</div>
+        <div class="sub">9-criteria weighted suitability model (MCDA)</div>
+        <div class="coord">16.889&deg;N&nbsp; 42.551&deg;E &nbsp;&bull;&nbsp; Jazan City, Jazan Region, KSA</div>
+      </div>
+      <div class="avgwrap">
+        <div class="avgcard">
+          <div class="lab">Mean suitability</div>
+          <div class="val" id="avgScore">--<small>/100</small></div>
+        </div>
+      </div>
+    </div>
+    <div class="legend">
+      <div class="lchip"><span class="dot" style="background:var(--exc)"></span>Excellent 80&ndash;100</div>
+      <div class="lchip"><span class="dot" style="background:var(--good)"></span>Good 65&ndash;79</div>
+      <div class="lchip"><span class="dot" style="background:var(--mod)"></span>Moderate 50&ndash;64</div>
+      <div class="lchip"><span class="dot" style="background:var(--low)"></span>Low &lt;50</div>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- LEFT: filters + KPIs + coverage -->
+    <div>
+      <div class="panel" style="margin-bottom:14px">
+        <div class="ph">Filters</div>
+        <div class="pb">
+          <div class="fgroup">
+            <label class="flab" for="hoodSel">Neighborhood</label>
+            <select id="hoodSel"><option value="ALL">All neighborhoods</option></select>
+          </div>
+          <div class="fgroup">
+            <label class="flab">Suitability class</label>
+            <div class="checks" id="classChecks"></div>
+          </div>
+          <div class="fgroup">
+            <label class="flab">Host type</label>
+            <div class="checks" id="hostChecks"></div>
+          </div>
+          <div class="fgroup">
+            <label class="flab">Map layers</label>
+            <div class="maptoggles">
+              <button class="tbtn active" id="tgSites">Sites</button>
+              <button class="tbtn" id="tgService">Service areas</button>
+              <button class="tbtn" id="tgHeat">Demand heat</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:14px">
+        <div class="ph">Site count by class</div>
+        <div class="pb">
+          <div class="kpis">
+            <div class="kpi exc"><div class="n" id="kExc">0</div><div class="l">Excellent</div></div>
+            <div class="kpi good"><div class="n" id="kGood">0</div><div class="l">Good</div></div>
+            <div class="kpi mod"><div class="n" id="kMod">0</div><div class="l">Moderate</div></div>
+            <div class="kpi low"><div class="n" id="kLow">0</div><div class="l">Low</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph">Population coverage</div>
+        <div class="pb">
+          <div class="cov" id="covBox"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER: map -->
+    <div class="panel mappanel">
+      <div class="mapcaption"><b>What this shows:</b> each dot is a possible parcel-locker location, colored by how suitable it is. Green is best, red is weakest. Click any site to see why it scored that way.</div>
+      <div id="map"></div>
+      <div class="mapnote" id="mapCount">Showing 0 candidate sites</div>
+    </div>
+
+    <!-- RIGHT: ranked table -->
+    <div class="panel">
+      <div class="ph" style="display:flex;justify-content:space-between;align-items:center;padding-right:14px">
+        <span>Ranked candidate sites</span>
+        <span style="color:var(--faint);font-size:9.5px" id="tblN"></span>
+      </div>
+      <div class="pb" style="padding:8px 0 0">
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th style="width:26px">#</th><th>Site</th><th>Host</th><th style="text-align:right">Score</th></tr></thead>
+            <tbody id="tblBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts">
+    <div class="panel">
+      <div class="ph">Distribution by suitability class</div>
+      <div class="pb"><div class="chartbox"><canvas id="classChart"></canvas></div></div>
+    </div>
+    <div class="panel">
+      <div class="ph">Incremental population coverage (10-min catchment)</div>
+      <div class="pb" style="padding-bottom:0"><div class="chartbox"><canvas id="covChart"></canvas></div></div>
+      <div class="chthesis">Each added locker is placed by descending score. The curve flattens as catchments overlap, which is why the pilot stops at the point of diminishing returns rather than deploying every candidate.</div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <div class="credit-line"><b>Ali Abutaleb, PhD</b> &bull; Remote Sensing and Geospatial Intelligence Consultant</div>
+    <div class="disc">Demonstration dashboard. Candidate sites, scores and coverage are representative illustrative values, not measured parcel data. Replace with hosted ArcGIS Online layers and the proxy-derived demand surface for production use.</div>
+  </footer>
+
+</div>
+
+<script>
+/* ---------- Model config ---------- */
+const WEIGHTS = {demand:20, density:15, roads:12, activity:12, gap:10, parking:8, safety:8, existDist:8, access:7};
+const CRIT_LABELS = {demand:'Demand', density:'Density', roads:'Road access', activity:'Activity centers', gap:'Coverage gap', parking:'Parking', safety:'Safety', existDist:'Distance to existing', access:'24/7 access'};
+const CORE_POP = 182000; // illustrative modeled core population
+
+/* Host-type profile: per-criterion offsets that shape each site's fingerprint */
+const HOST_PROFILE = {
+  'Fuel Station':      {parking:18, access:18, roads:12, safety:4,  activity:-10, demand:-2},
+  'Shopping Mall':     {activity:18, demand:12, parking:10, safety:8, access:-6, roads:2},
+  'Government Center': {safety:12, gap:-8, existDist:-8, activity:4, access:-10, demand:-2},
+  'Public Parking':    {parking:20, access:6, activity:-8, demand:-6, safety:-2},
+  'University':        {demand:16, activity:10, density:6, access:4, parking:6}
+};
+
+/* ---------- Candidate sites (representative) ----------
+   q = base quality tier; final score is computed live from the weighted model */
+const RAW = [
+  ['S01','Al Shati Corniche Mall','Al Shati','Shopping Mall',16.8975,42.5490,88,44000],
+  ['S02','King Fahd Road Fuel Hub','Ar Rawabi','Fuel Station',16.8905,42.5585,86,39000],
+  ['S03','Jazan University Main Gate','Al Jamiah','University',16.8600,42.5760,85,36000],
+  ['S04','Al Rawabi Health Cluster','Ar Rawabi','Government Center',16.8955,42.5622,74,31000],
+  ['S05','Al Muntazah Mall','Al Muntazah','Shopping Mall',16.9050,42.5560,76,33000],
+  ['S06','Al Rawdah Plaza Parking','Al Rawdah','Public Parking',16.9010,42.5650,72,27000],
+  ['S07','Al Andalus Community Center','Al Andalus','Government Center',16.8820,42.5610,71,26000],
+  ['S08','Al Suways Fuel Hub','Al Suways','Fuel Station',16.8790,42.5665,73,28000],
+  ['S09','Ar Rehab Retail Strip','Ar Rehab','Shopping Mall',16.8930,42.5700,70,25000],
+  ['S10','Al Balad Central Node','Al Balad','Government Center',16.8862,42.5528,66,29000],
+  ['S11','Al Naseem Parking Deck','Al Naseem','Public Parking',16.8880,42.5760,58,18000],
+  ['S12','Al Safa Fuel & Rest','Al Safa','Fuel Station',16.8720,42.5590,57,17000],
+  ['S13','Al Nakheel Fuel Station','Al Nakheel','Fuel Station',16.8680,42.5700,56,16000],
+  ['S14','Al Qods Municipal Office','Al Qods','Government Center',16.9080,42.5720,54,15000],
+  ['S15','Al Matar Logistics Point','Al Matar','Fuel Station',16.9010,42.5860,52,13000],
+  ['S16','Southern Ring Fuel','Al Jamiah','Fuel Station',16.8505,42.5705,53,14000],
+  ['S17','Jazan Port Gate Parking','Al Shati','Public Parking',16.9100,42.5450,47,9000],
+  ['S18','Al Shati North Kiosk','Al Shati','Public Parking',16.9130,42.5512,45,8000]
+];
+
+const clamp=(v)=>Math.max(4,Math.min(98,Math.round(v)));
+function buildSite(r){
+  const [id,name,hood,host,lat,lng,q,pop]=r;
+  const off=HOST_PROFILE[host]||{};
+  const sub={};
+  for(const k in WEIGHTS){ sub[k]=clamp(q + (off[k]||0) + ((id.charCodeAt(2)+k.length)%5-2)); }
+  let final=0; for(const k in WEIGHTS){ final += WEIGHTS[k]*sub[k]; }
+  final=Math.round(final/100);
+  const cls = final>=80?'exc':final>=65?'good':final>=50?'mod':'low';
+  return {id,name,hood,host,lat,lng,pop10:pop,sub,final,cls};
+}
+const SITES = RAW.map(buildSite).sort((a,b)=>b.final-a.final);
+const CLS_META={exc:{c:'#17A24A',t:'Excellent'},good:{c:'#2F6FEB',t:'Good'},mod:{c:'#E39A20',t:'Moderate'},low:{c:'#D9534A',t:'Low'}};
+
+/* ---------- State ---------- */
+const state = {
+  hood:'ALL',
+  classes:new Set(['exc','good','mod','low']),
+  hosts:new Set([...new Set(SITES.map(s=>s.host))]),
+  showSites:true, showService:false, showHeat:false
+};
+
+/* ---------- Map ---------- */
+const map = L.map('map',{zoomControl:true,scrollWheelZoom:true}).setView([16.889,42.565],13);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  subdomains:'abcd',maxZoom:19,
+  attribution:'&copy; OpenStreetMap &copy; CARTO'
+}).addTo(map);
+
+// Cartographer credit, stays with the map on any screenshot
+const credit=L.control({position:'bottomleft'});
+credit.onAdd=function(){
+  const d=L.DomUtil.create('div','map-credit');
+  d.innerHTML='Ali Abutaleb, PhD &bull; Remote Sensing and Geospatial Intelligence Consultant';
+  return d;
+};
+credit.addTo(map);
+
+const markerLayer=L.layerGroup().addTo(map);
+const serviceLayer=L.layerGroup().addTo(map);
+let heatLayer=null;
+const markerIndex={};
+
+function markerHTML(color){
+  return `<div style="width:20px;height:20px;border-radius:50% 50% 50% 0;background:${color};border:2.5px solid #fff;box-shadow:0 2px 5px rgba(0,0,0,.35);transform:rotate(-45deg)"></div>`;
+}
+function popupHTML(s){
+  const meta=CLS_META[s.cls];
+  const order=Object.keys(WEIGHTS).sort((a,b)=>s.sub[b]-s.sub[a]).slice(0,4);
+  let rows=order.map(k=>`<div class="prow"><span>${CRIT_LABELS[k]}</span><span>${s.sub[k]}</span></div>
+    <div class="minibar"><span style="width:${s.sub[k]}%"></span></div>`).join('');
+  return `<div class="pop">
+    <h4>${s.name}</h4>
+    <div class="ph2">${s.hood} &bull; ${s.host}</div>
+    <div class="final"><span class="big" style="color:${meta.c}">${s.final}</span>
+      <span class="cls" style="background:${meta.c}">${meta.t}</span></div>
+    <div class="prow" style="color:#5B6E75"><span>Population within 10 min</span><span>${s.pop10.toLocaleString()}</span></div>
+    <div style="height:6px"></div>
+    <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;color:#8A9AA0;text-transform:uppercase;margin-bottom:3px">Top scoring criteria</div>
+    ${rows}
+  </div>`;
+}
+
+function drawMap(list){
+  markerLayer.clearLayers(); serviceLayer.clearLayers();
+  if(heatLayer){map.removeLayer(heatLayer);heatLayer=null;}
+
+  if(state.showSites){
+    list.forEach(s=>{
+      const icon=L.divIcon({html:markerHTML(CLS_META[s.cls].c),className:'',iconSize:[20,20],iconAnchor:[10,18],popupAnchor:[0,-16]});
+      const m=L.marker([s.lat,s.lng],{icon}).bindPopup(popupHTML(s));
+      m.addTo(markerLayer); markerIndex[s.id]=m;
+    });
+  }
+  if(state.showService){
+    list.forEach(s=>{
+      L.circle([s.lat,s.lng],{radius:1150,color:CLS_META[s.cls].c,weight:1.3,opacity:.85,dashArray:'4 4',fillColor:CLS_META[s.cls].c,fillOpacity:.14}).addTo(serviceLayer);
+    });
+  }
+  if(state.showHeat && window.L.heatLayer){
+    const pts=[];
+    list.forEach(s=>{
+      const w=s.sub.demand/100;
+      pts.push([s.lat,s.lng,w]);
+      for(let i=0;i<6;i++){ // scatter to form a surface around each demand node
+        pts.push([s.lat+(Math.random()-.5)*0.012, s.lng+(Math.random()-.5)*0.012, w*0.6]);
+      }
+    });
+    heatLayer=L.heatLayer(pts,{radius:34,blur:26,maxZoom:15,minOpacity:.32,
+      gradient:{0.2:'#2F6FEB',0.45:'#17A24A',0.7:'#E39A20',0.9:'#D9534A'}}).addTo(map);
+  }
+}
+
+/* ---------- Coverage model ---------- */
+const COV_MAX={5:0.42,10:0.90,15:0.98};
+const COV_K={5:0.20,10:0.30,15:0.42};
+function coverageAt(sortedList,mins,n){
+  let eff=0;
+  for(let i=0;i<Math.min(n,sortedList.length);i++){ eff += COV_K[mins]*(sortedList[i].final/100); }
+  return COV_MAX[mins]*(1-Math.exp(-eff));
+}
+
+/* ---------- Charts ---------- */
+let classChart, covChart;
+function initCharts(){
+  classChart=new Chart(document.getElementById('classChart'),{
+    type:'doughnut',
+    data:{labels:['Excellent','Good','Moderate','Low'],
+      datasets:[{data:[0,0,0,0],backgroundColor:['#17A24A','#2F6FEB','#E39A20','#D9534A'],borderWidth:2,borderColor:'#fff'}]},
+    options:{cutout:'62%',plugins:{legend:{position:'bottom',labels:{boxWidth:11,font:{size:11},padding:12}}},
+      responsive:true,maintainAspectRatio:false}
+  });
+  covChart=new Chart(document.getElementById('covChart'),{
+    type:'line',
+    data:{labels:[],datasets:[{label:'Population within 10 min',data:[],
+      borderColor:'#0FA79E',backgroundColor:'rgba(15,167,158,.12)',fill:true,tension:.35,
+      pointRadius:3,pointBackgroundColor:'#0FA79E',borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%',font:{size:10}},title:{display:true,text:'Coverage',font:{size:10}}},
+        x:{title:{display:true,text:'Number of lockers deployed',font:{size:10}},ticks:{font:{size:10}}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y.toFixed(1)+'% covered'}}}}
+  });
+}
+
+/* ---------- Render ---------- */
+function filtered(){
+  return SITES.filter(s=>
+    (state.hood==='ALL'||s.hood===state.hood) &&
+    state.classes.has(s.cls) &&
+    state.hosts.has(s.host)
+  );
+}
+function render(){
+  const list=filtered();
+
+  // avg + kpi counts
+  const avg=list.length?Math.round(list.reduce((a,s)=>a+s.final,0)/list.length):0;
+  document.getElementById('avgScore').innerHTML = (list.length?avg:'--')+'<small>/100</small>';
+  const cnt={exc:0,good:0,mod:0,low:0}; list.forEach(s=>cnt[s.cls]++);
+  kExc.textContent=cnt.exc; kGood.textContent=cnt.good; kMod.textContent=cnt.mod; kLow.textContent=cnt.low;
+
+  // coverage bars
+  const n=list.length;
+  const covBox=document.getElementById('covBox'); covBox.innerHTML='';
+  [5,10,15].forEach(m=>{
+    const pct=coverageAt(list,m,n)*100;
+    covBox.insertAdjacentHTML('beforeend',
+      `<div class="covrow"><div class="cvtop"><span>Within ${m} minutes</span><b>${pct.toFixed(0)}%</b></div>
+       <div class="bar"><span style="width:${pct.toFixed(0)}%"></span></div></div>`);
+  });
+
+  // table
+  const tb=document.getElementById('tblBody'); tb.innerHTML='';
+  list.forEach((s,i)=>{
+    const meta=CLS_META[s.cls];
+    tb.insertAdjacentHTML('beforeend',
+      `<tr data-id="${s.id}">
+        <td class="rank">${String(i+1).padStart(2,'0')}</td>
+        <td><div class="sname">${s.name}</div><div class="shood">${s.hood}</div></td>
+        <td style="font-size:11.5px;color:var(--soft)">${s.host}</td>
+        <td style="text-align:right"><span class="scorepill" style="background:${meta.c}">${s.final}</span></td>
+      </tr>`);
+  });
+  document.getElementById('tblN').textContent=list.length+' shown';
+  document.getElementById('mapCount').textContent='Showing '+list.length+' candidate site'+(list.length===1?'':'s')+(state.showService?'  +  10-min service areas':'')+(state.showHeat?'  +  demand heat surface':'');
+  tb.querySelectorAll('tr').forEach(tr=>tr.addEventListener('click',()=>{
+    const s=list.find(x=>x.id===tr.dataset.id);
+    map.flyTo([s.lat,s.lng],15,{duration:.6});
+    setTimeout(()=>{ if(markerIndex[s.id]) markerIndex[s.id].openPopup(); },650);
+  }));
+
+  // charts
+  classChart.data.datasets[0].data=[cnt.exc,cnt.good,cnt.mod,cnt.low]; classChart.update();
+  const labels=[],data=[];
+  for(let k=1;k<=list.length;k++){ labels.push(k); data.push(coverageAt(list,10,k)*100); }
+  covChart.data.labels=labels; covChart.data.datasets[0].data=data; covChart.update();
+
+  drawMap(list);
+}
+
+/* ---------- Controls ---------- */
+function buildControls(){
+  // hoods
+  const hoods=[...new Set(SITES.map(s=>s.hood))].sort();
+  const sel=document.getElementById('hoodSel');
+  hoods.forEach(h=>{const o=document.createElement('option');o.value=h;o.textContent=h;sel.appendChild(o);});
+  sel.addEventListener('change',e=>{state.hood=e.target.value;render();});
+
+  // class checks
+  const cc=document.getElementById('classChecks');
+  Object.entries(CLS_META).forEach(([k,v])=>{
+    const el=document.createElement('label'); el.className='chk';
+    el.innerHTML=`<input type="checkbox" checked data-c="${k}"><span class="cdot" style="background:${v.c}"></span>${v.t}`;
+    cc.appendChild(el);
+    el.querySelector('input').addEventListener('change',e=>{
+      e.target.checked?state.classes.add(k):state.classes.delete(k); render();
+    });
+  });
+  // host checks
+  const hc=document.getElementById('hostChecks');
+  [...new Set(SITES.map(s=>s.host))].forEach(h=>{
+    const el=document.createElement('label'); el.className='chk';
+    el.innerHTML=`<input type="checkbox" checked data-h="${h}"><span>${h}</span>`;
+    hc.appendChild(el);
+    el.querySelector('input').addEventListener('change',e=>{
+      e.target.checked?state.hosts.add(h):state.hosts.delete(h); render();
+    });
+  });
+  // toggles
+  const bind=(id,key)=>{const b=document.getElementById(id);b.addEventListener('click',()=>{
+    state[key]=!state[key]; b.classList.toggle('active',state[key]); render();
+  });};
+  bind('tgSites','showSites'); bind('tgService','showService'); bind('tgHeat','showHeat');
+}
+
+initCharts(); buildControls(); render();
+</script>
+</body>
+</html>
