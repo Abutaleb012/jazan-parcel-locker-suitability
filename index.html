@@ -64,7 +64,7 @@
   .tbtn.active{background:var(--ink);color:#fff;border-color:var(--ink)}
 
   /* KPI cards */
-  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .kpis{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
   .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:#fff}
   .kpi .n{font-family:var(--mono);font-size:22px;font-weight:600;line-height:1}
   .kpi .l{font-size:10.5px;color:var(--soft);margin-top:3px;letter-spacing:.2px}
@@ -154,7 +154,6 @@
       <div class="lchip"><span class="dot" style="background:var(--exc)"></span>Excellent 80&ndash;100</div>
       <div class="lchip"><span class="dot" style="background:var(--good)"></span>Good 65&ndash;79</div>
       <div class="lchip"><span class="dot" style="background:var(--mod)"></span>Moderate 50&ndash;64</div>
-      <div class="lchip"><span class="dot" style="background:var(--low)"></span>Low &lt;50</div>
       <div class="lchip"><span class="dot" style="background:#E23B2E;border-radius:2px"></span>Existing RedBox point</div>
     </div>
   </header>
@@ -198,7 +197,6 @@
             <div class="kpi exc"><div class="n" id="kExc">0</div><div class="l">Excellent</div></div>
             <div class="kpi good"><div class="n" id="kGood">0</div><div class="l">Good</div></div>
             <div class="kpi mod"><div class="n" id="kMod">0</div><div class="l">Moderate</div></div>
-            <div class="kpi low"><div class="n" id="kLow">0</div><div class="l">Low</div></div>
           </div>
         </div>
       </div>
@@ -469,8 +467,8 @@ let classChart, covChart;
 function initCharts(){
   classChart=new Chart(document.getElementById('classChart'),{
     type:'doughnut',
-    data:{labels:['Excellent','Good','Moderate','Low'],
-      datasets:[{data:[0,0,0,0],backgroundColor:['#17A24A','#2F6FEB','#E39A20','#D9534A'],borderWidth:2,borderColor:'#fff'}]},
+    data:{labels:['Excellent','Good','Moderate'],
+      datasets:[{data:[0,0,0],backgroundColor:['#17A24A','#2F6FEB','#E39A20'],borderWidth:2,borderColor:'#fff'}]},
     options:{cutout:'62%',plugins:{legend:{position:'bottom',labels:{boxWidth:11,font:{size:11},padding:12}}},
       responsive:true,maintainAspectRatio:false}
   });
@@ -501,7 +499,7 @@ function render(){
   const avg=list.length?Math.round(list.reduce((a,s)=>a+s.final,0)/list.length):0;
   document.getElementById('avgScore').innerHTML = (list.length?avg:'--')+'<small>/100</small>';
   const cnt={exc:0,good:0,mod:0,low:0}; list.forEach(s=>cnt[s.cls]++);
-  kExc.textContent=cnt.exc; kGood.textContent=cnt.good; kMod.textContent=cnt.mod; kLow.textContent=cnt.low;
+  kExc.textContent=cnt.exc; kGood.textContent=cnt.good; kMod.textContent=cnt.mod;
 
   // coverage bars
   const n=list.length;
@@ -534,7 +532,7 @@ function render(){
   }));
 
   // charts
-  classChart.data.datasets[0].data=[cnt.exc,cnt.good,cnt.mod,cnt.low]; classChart.update();
+  classChart.data.datasets[0].data=[cnt.exc,cnt.good,cnt.mod]; classChart.update();
   const labels=[],data=[];
   for(let k=1;k<=list.length;k++){ labels.push(k); data.push(coverageAt(list,10,k)*100); }
   covChart.data.labels=labels; covChart.data.datasets[0].data=data; covChart.update();
