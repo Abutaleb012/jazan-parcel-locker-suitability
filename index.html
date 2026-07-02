@@ -251,7 +251,7 @@
 
   <footer class="foot">
     <div class="credit-line"><b>Ali Abutaleb, PhD</b> &bull; Remote Sensing and Geospatial Intelligence Consultant</div>
-    <div class="disc">Demonstration dashboard. Candidate sites, scores and coverage are representative illustrative values, not measured parcel data. Existing RedBox point locations are actual coordinates from RedBox's public map (17 points, converted from DMS). Replace with hosted ArcGIS Online layers and the proxy-derived demand surface for production use.</div>
+    <div class="disc">Demonstration dashboard. Candidate locations are real Jazan host sites from Google Places (malls, fuel stations, supermarkets, hospitals, university); the demand and suitability scores are illustrative proxy values, not measured parcel data. Existing RedBox point locations are actual coordinates from RedBox's public map (17 points, converted from DMS). Replace the demand layer with a proxy-derived surface for production use.</div>
   </footer>
 
 </div>
@@ -266,32 +266,34 @@ const CORE_POP = 182000; // illustrative modeled core population
 const HOST_PROFILE = {
   'Fuel Station':      {parking:18, access:18, roads:12, safety:4,  activity:-10, demand:-2},
   'Shopping Mall':     {activity:18, demand:12, parking:10, safety:8, access:-6, roads:2},
-  'Government Center': {safety:12, gap:-8, existDist:-8, activity:4, access:-10, demand:-2},
-  'Public Parking':    {parking:20, access:6, activity:-8, demand:-6, safety:-2},
+  'Supermarket':       {demand:12, activity:14, parking:12, access:6, safety:4, roads:2},
+  'Hospital':          {safety:12, access:10, activity:6, parking:6, demand:2, roads:4},
   'University':        {demand:16, activity:10, density:6, access:4, parking:6}
 };
 
-/* ---------- Candidate sites (representative) ----------
-   q = base quality tier; final score is computed live from the weighted model */
+/* ---------- Candidate sites (REAL host locations, Google Places) ----------
+   Coordinates are actual Jazan businesses (malls, fuel stations, supermarkets,
+   hospitals, university), so every point sits on land. q = illustrative demand tier;
+   final score is computed live from the weighted model. */
 const RAW = [
-  ['S01','Al Shati Corniche Mall','Al Shati','Shopping Mall',16.8975,42.5490,88,44000],
-  ['S02','King Fahd Road Fuel Hub','Ar Rawabi','Fuel Station',16.8905,42.5585,86,39000],
-  ['S03','Jazan University Main Gate','Al Jamiah','University',16.8600,42.5760,85,36000],
-  ['S04','Al Rawabi Health Cluster','Ar Rawabi','Government Center',16.8955,42.5622,74,31000],
-  ['S05','Al Muntazah Mall','Al Muntazah','Shopping Mall',16.9050,42.5560,76,33000],
-  ['S06','Al Rawdah Plaza Parking','Al Rawdah','Public Parking',16.9010,42.5650,72,27000],
-  ['S07','Al Andalus Community Center','Al Andalus','Government Center',16.8820,42.5610,71,26000],
-  ['S08','Al Suways Fuel Hub','Al Suways','Fuel Station',16.8790,42.5665,73,28000],
-  ['S09','Ar Rehab Retail Strip','Ar Rehab','Shopping Mall',16.8930,42.5700,70,25000],
-  ['S10','Al Balad Central Node','Al Balad','Government Center',16.8862,42.5528,66,29000],
-  ['S11','Al Naseem Parking Deck','Al Naseem','Public Parking',16.8880,42.5760,58,18000],
-  ['S12','Al Safa Fuel & Rest','Al Safa','Fuel Station',16.8720,42.5590,57,17000],
-  ['S13','Al Nakheel Fuel Station','Al Nakheel','Fuel Station',16.8680,42.5700,56,16000],
-  ['S14','Al Qods Municipal Office','Al Qods','Government Center',16.9080,42.5720,54,15000],
-  ['S15','Al Matar Logistics Point','Al Matar','Fuel Station',16.9010,42.5860,52,13000],
-  ['S16','Southern Ring Fuel','Al Jamiah','Fuel Station',16.8505,42.5705,53,14000],
-  ['S17','Jazan Port Gate Parking','Al Shati','Public Parking',16.9100,42.5450,47,9000],
-  ['S18','Al Shati North Kiosk','Al Shati','Public Parking',16.9130,42.5512,45,8000]
+  ['S01','Jazan University','Al Maarefah','University',16.965809,42.541804,72,30000],
+  ['S02','Al Rashid Mall','Ash Shati','Shopping Mall',16.902904,42.553645,84,34000],
+  ['S03','Sky Mall','Ash Shati','Shopping Mall',16.904192,42.546729,78,28000],
+  ['S04','Jazan Mall','Ash Shati','Shopping Mall',16.898894,42.546143,76,26000],
+  ['S05','Kadi Park Mall','Ash Shati','Shopping Mall',16.908699,42.546381,75,25000],
+  ['S06','Alshamil Mall','Ash Shati','Shopping Mall',16.907468,42.550225,80,30000],
+  ['S07','J127 Liter Station','Al Rawdah','Fuel Station',16.898281,42.568479,74,24000],
+  ['S08','Al Safa Gas Station','Al Safa','Fuel Station',16.889785,42.561263,76,27000],
+  ['S09','Aldrees Ash Shati','Ash Shati','Fuel Station',16.906358,42.553656,73,23000],
+  ['S10','Al Salam Gas Station','Al Jabal','Fuel Station',16.894388,42.553340,70,22000],
+  ['S11','Aldrees Ar Rawabi','Ar Rawabi','Fuel Station',16.930742,42.607380,56,12000],
+  ['S12','J054 Liter Station','Industrial Area','Fuel Station',16.834412,42.608603,54,11000],
+  ['S13','Panda Hyper (Airport)','Al Safa','Supermarket',16.883341,42.583940,74,26000],
+  ['S14','The Green Center','Al Rawdah','Supermarket',16.888363,42.574948,70,21000],
+  ['S15','Othaim Markets','North Corniche','Supermarket',16.910844,42.551721,72,23000],
+  ['S16','Universal Cold Store','East Jizan','Supermarket',16.892789,42.582463,66,17000],
+  ['S17','Jazan General Hospital','Al Suways','Hospital',16.895723,42.555787,74,25000],
+  ['S18','Alemies Hospital','Al Rawdah','Hospital',16.890907,42.569353,71,22000]
 ];
 
 const clamp=(v)=>Math.max(4,Math.min(98,Math.round(v)));
@@ -362,7 +364,7 @@ const state = {
 };
 
 /* ---------- Map ---------- */
-const map = L.map('map',{zoomControl:true,scrollWheelZoom:true}).setView([16.889,42.565],13);
+const map = L.map('map',{zoomControl:true,scrollWheelZoom:true}).setView([16.908,42.567],12);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
   subdomains:'abcd',maxZoom:19,
   attribution:'&copy; OpenStreetMap &copy; CARTO'
