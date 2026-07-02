@@ -59,8 +59,8 @@
   .chk{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);cursor:pointer;user-select:none}
   .chk input{accent-color:var(--sea);width:15px;height:15px}
   .chk .cdot{width:9px;height:9px;border-radius:2px}
-  .maptoggles{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
-  .tbtn{flex:1;min-width:0;font-family:var(--mono);font-size:11px;letter-spacing:.3px;padding:8px 6px;border:1px solid var(--line);background:#fff;border-radius:8px;color:var(--soft);cursor:pointer;text-align:center;transition:.15s}
+  .maptoggles{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:2px}
+  .tbtn{font-family:var(--mono);font-size:10px;letter-spacing:.1px;padding:7px 4px;border:1px solid var(--line);background:#fff;border-radius:8px;color:var(--soft);cursor:pointer;text-align:center;transition:.15s;line-height:1.2;min-height:40px;display:flex;align-items:center;justify-content:center;word-break:normal;overflow-wrap:break-word}
   .tbtn.active{background:var(--ink);color:#fff;border-color:var(--ink)}
 
   /* KPI cards */
@@ -358,7 +358,7 @@ SITES.sort((a,b)=>b.final-a.final);
 /* ---------- State ---------- */
 const state = {
   hood:'ALL',
-  classes:new Set(['exc','good','mod','low']),
+  classes:new Set([...new Set(SITES.map(s=>s.cls))]),
   hosts:new Set([...new Set(SITES.map(s=>s.host))]),
   showSites:true, showService:false, showHeat:false, showRedbox:false, showGap:false
 };
@@ -550,9 +550,11 @@ function buildControls(){
   hoods.forEach(h=>{const o=document.createElement('option');o.value=h;o.textContent=h;sel.appendChild(o);});
   sel.addEventListener('change',e=>{state.hood=e.target.value;render();});
 
-  // class checks
+  // class checks (only classes present in the data)
   const cc=document.getElementById('classChecks');
+  const presentClasses=new Set(SITES.map(s=>s.cls));
   Object.entries(CLS_META).forEach(([k,v])=>{
+    if(!presentClasses.has(k)) return;
     const el=document.createElement('label'); el.className='chk';
     el.innerHTML=`<input type="checkbox" checked data-c="${k}"><span class="cdot" style="background:${v.c}"></span>${v.t}`;
     cc.appendChild(el);
