@@ -139,7 +139,7 @@
           <h1>Jazan Smart Parcel Locker Suitability</h1>
           <div class="artitle" lang="ar">أفضل مواقع محطات الطرود الذكية في جازان</div>
         </div>
-        <div class="plain">Finding the best places for parcel lockers in Jazan so more deliveries succeed the first time.</div>
+        <div class="plain">Finding the gaps in Jazan's parcel-locker coverage, beyond the existing RedBox network, so more deliveries succeed the first time.</div>
         <div class="sub">9-criteria weighted suitability model (MCDA)</div>
         <div class="coord">16.889&deg;N&nbsp; 42.551&deg;E &nbsp;&bull;&nbsp; Jazan City, Jazan Region, KSA</div>
       </div>
@@ -155,6 +155,7 @@
       <div class="lchip"><span class="dot" style="background:var(--good)"></span>Good 65&ndash;79</div>
       <div class="lchip"><span class="dot" style="background:var(--mod)"></span>Moderate 50&ndash;64</div>
       <div class="lchip"><span class="dot" style="background:var(--low)"></span>Low &lt;50</div>
+      <div class="lchip"><span class="dot" style="background:#E23B2E;border-radius:2px"></span>Existing RedBox point</div>
     </div>
   </header>
 
@@ -183,6 +184,8 @@
               <button class="tbtn active" id="tgSites">Sites</button>
               <button class="tbtn" id="tgService">Service areas</button>
               <button class="tbtn" id="tgHeat">Demand heat</button>
+              <button class="tbtn" id="tgRedbox">RedBox network</button>
+              <button class="tbtn" id="tgGap">Gap zones</button>
             </div>
           </div>
         </div>
@@ -248,7 +251,7 @@
 
   <footer class="foot">
     <div class="credit-line"><b>Ali Abutaleb, PhD</b> &bull; Remote Sensing and Geospatial Intelligence Consultant</div>
-    <div class="disc">Demonstration dashboard. Candidate sites, scores and coverage are representative illustrative values, not measured parcel data. Replace with hosted ArcGIS Online layers and the proxy-derived demand surface for production use.</div>
+    <div class="disc">Demonstration dashboard. Candidate sites, scores and coverage are representative illustrative values, not measured parcel data. Existing RedBox point locations are actual coordinates from RedBox's public map (17 points, converted from DMS). Replace with hosted ArcGIS Online layers and the proxy-derived demand surface for production use.</div>
   </footer>
 
 </div>
@@ -305,12 +308,57 @@ function buildSite(r){
 const SITES = RAW.map(buildSite).sort((a,b)=>b.final-a.final);
 const CLS_META={exc:{c:'#17A24A',t:'Excellent'},good:{c:'#2F6FEB',t:'Good'},mod:{c:'#E39A20',t:'Moderate'},low:{c:'#D9534A',t:'Low'}};
 
+/* ---------- Existing network: RedBox (ACTUAL coordinates from RedBox's public map) ----------
+   17 live RedBox pickup points in Jazan, converted from the degrees-minutes-seconds
+   coordinates read off the official Find-a-RedBox-Point map. Each candidate's
+   "distance from existing points" criterion is computed live against this real network. */
+const EXISTING = [
+  ['RB-01','RedBox Jazan','Pickup point',16.888528,42.564889],
+  ['RB-02','RedBox Jazan','Pickup point',16.902444,42.551583],
+  ['RB-03','RedBox Jazan','Pickup point',16.900667,42.547806],
+  ['RB-04','RedBox Jazan','Pickup point',16.899083,42.576556],
+  ['RB-05','RedBox Jazan','Pickup point',16.8805,42.570194],
+  ['RB-06','RedBox Jazan','Pickup point',16.906361,42.549806],
+  ['RB-07','RedBox Jazan','Pickup point',16.910694,42.551583],
+  ['RB-08','RedBox Jazan','Pickup point',16.907306,42.545833],
+  ['RB-09','RedBox Jazan','Pickup point',16.874361,42.571389],
+  ['RB-10','RedBox Jazan','Pickup point',16.883194,42.584028],
+  ['RB-11','RedBox Jazan','Pickup point',16.922583,42.548917],
+  ['RB-12','RedBox Jazan','Pickup point',16.93,42.565306],
+  ['RB-13','RedBox Jazan','Pickup point',16.935278,42.55675],
+  ['RB-14','RedBox Jazan','Pickup point',16.944639,42.556833],
+  ['RB-15','RedBox Jazan','Pickup point',16.951833,42.561194],
+  ['RB-16','RedBox Jazan','Pickup point',16.955444,42.566639],
+  ['RB-17','RedBox Jazan','Pickup point',16.929222,42.622806]
+];
+
+function haversineKm(la1,lo1,la2,lo2){
+  const R=6371,toR=x=>x*Math.PI/180;
+  const dLa=toR(la2-la1),dLo=toR(lo2-lo1);
+  const s=Math.sin(dLa/2)**2+Math.cos(toR(la1))*Math.cos(toR(la2))*Math.sin(dLo/2)**2;
+  return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));
+}
+const GAP_THRESHOLD_KM=0.8; // approximate RedBox served radius; beyond this a candidate fills a gap
+
+// Re-derive criterion 8 (distance from existing points) from the real network, then re-score every site
+SITES.forEach(s=>{
+  let min=Infinity;
+  EXISTING.forEach(e=>{const d=haversineKm(s.lat,s.lng,e[3],e[4]); if(d<min)min=d;});
+  s.nearestKm=min;
+  s.gapOpp=min>=GAP_THRESHOLD_KM;
+  s.sub.existDist=clamp(Math.min(100,(min/1.5)*100)); // farther from any RedBox = higher opportunity
+  let final=0; for(const k in WEIGHTS){ final+=WEIGHTS[k]*s.sub[k]; }
+  s.final=Math.round(final/100);
+  s.cls=s.final>=80?'exc':s.final>=65?'good':s.final>=50?'mod':'low';
+});
+SITES.sort((a,b)=>b.final-a.final);
+
 /* ---------- State ---------- */
 const state = {
   hood:'ALL',
   classes:new Set(['exc','good','mod','low']),
   hosts:new Set([...new Set(SITES.map(s=>s.host))]),
-  showSites:true, showService:false, showHeat:false
+  showSites:true, showService:false, showHeat:false, showRedbox:false, showGap:false
 };
 
 /* ---------- Map ---------- */
@@ -331,11 +379,16 @@ credit.addTo(map);
 
 const markerLayer=L.layerGroup().addTo(map);
 const serviceLayer=L.layerGroup().addTo(map);
+const redboxLayer=L.layerGroup().addTo(map);
+const gapLayer=L.layerGroup().addTo(map);
 let heatLayer=null;
 const markerIndex={};
 
 function markerHTML(color){
   return `<div style="width:20px;height:20px;border-radius:50% 50% 50% 0;background:${color};border:2.5px solid #fff;box-shadow:0 2px 5px rgba(0,0,0,.35);transform:rotate(-45deg)"></div>`;
+}
+function redboxHTML(){
+  return `<div style="width:15px;height:15px;border-radius:3px;background:#E23B2E;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)"></div>`;
 }
 function popupHTML(s){
   const meta=CLS_META[s.cls];
@@ -348,6 +401,8 @@ function popupHTML(s){
     <div class="final"><span class="big" style="color:${meta.c}">${s.final}</span>
       <span class="cls" style="background:${meta.c}">${meta.t}</span></div>
     <div class="prow" style="color:#5B6E75"><span>Population within 10 min</span><span>${s.pop10.toLocaleString()}</span></div>
+    <div class="prow" style="color:#5B6E75"><span>Nearest RedBox point</span><span>${s.nearestKm.toFixed(2)} km</span></div>
+    ${s.gapOpp?`<div style="margin-top:6px;font-size:10.5px;font-weight:700;color:#C63A2E;background:#FCE9E7;border-radius:5px;padding:4px 7px;text-align:center">Gap opportunity, outside RedBox coverage</div>`:''}
     <div style="height:6px"></div>
     <div style="font-family:var(--mono);font-size:9.5px;letter-spacing:.6px;color:#8A9AA0;text-transform:uppercase;margin-bottom:3px">Top scoring criteria</div>
     ${rows}
@@ -355,8 +410,22 @@ function popupHTML(s){
 }
 
 function drawMap(list){
-  markerLayer.clearLayers(); serviceLayer.clearLayers();
+  markerLayer.clearLayers(); serviceLayer.clearLayers(); redboxLayer.clearLayers(); gapLayer.clearLayers();
   if(heatLayer){map.removeLayer(heatLayer);heatLayer=null;}
+
+  // Gap zones: red coverage discs around existing RedBox points. Areas outside them are the gaps.
+  if(state.showGap){
+    EXISTING.forEach(e=>{
+      L.circle([e[3],e[4]],{radius:GAP_THRESHOLD_KM*1000,color:'#E23B2E',weight:0.8,opacity:.35,fillColor:'#E23B2E',fillOpacity:.10}).addTo(gapLayer);
+    });
+  }
+  // Existing RedBox network
+  if(state.showRedbox){
+    EXISTING.forEach(e=>{
+      const icon=L.divIcon({html:redboxHTML(),className:'',iconSize:[15,15],iconAnchor:[7,7],popupAnchor:[0,-8]});
+      L.marker([e[3],e[4]],{icon}).bindPopup(`<div class="pop"><h4 style="color:#C63A2E">RedBox ${e[0]}</h4><div class="ph2">${e[1]} &bull; ${e[2]}</div><div style="font-size:10.5px;color:#8A9AA0;font-family:var(--mono)">Existing network (approximate)</div></div>`).addTo(redboxLayer);
+    });
+  }
 
   if(state.showSites){
     list.forEach(s=>{
@@ -504,6 +573,7 @@ function buildControls(){
     state[key]=!state[key]; b.classList.toggle('active',state[key]); render();
   });};
   bind('tgSites','showSites'); bind('tgService','showService'); bind('tgHeat','showHeat');
+  bind('tgRedbox','showRedbox'); bind('tgGap','showGap');
 }
 
 initCharts(); buildControls(); render();
